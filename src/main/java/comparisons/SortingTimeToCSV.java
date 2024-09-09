@@ -2,6 +2,8 @@ package comparisons;
 
 import sorts.MergeSort;
 import sorts.ParallelMergeSort;
+import sorts.ParallelQuickSort;
+import sorts.QuickSort;
 import functions.CheckSorted;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -15,10 +17,10 @@ public class SortingTimeToCSV {
         final int MAX = 100000;
         final int TRIALS = 10;
 
-        String csvFile = "merge-sort-times.csv";
+        String csvFile = "times.csv";
         int i = 0;
         try (FileWriter writer = new FileWriter(csvFile)) {
-            writer.append("Elements, Seq, Par\n");
+            writer.append("Elements, M Seq, M Par, Q Seq, Q Par\n");
             for (int size: sizes) {
                 int[] data = getData(size, MAX);
 
@@ -30,7 +32,7 @@ public class SortingTimeToCSV {
                         System.out.println("Seq array not sorted correctly!");
                     }
                 }
-                long sequentialTime = (System.currentTimeMillis() - startTime) / (long)TRIALS;
+                long sequentialTimeM = (System.currentTimeMillis() - startTime) / (long)TRIALS;
 
                 startTime = System.currentTimeMillis();
                 for (int j = 0; j < TRIALS; j++) {
@@ -40,13 +42,37 @@ public class SortingTimeToCSV {
                         System.out.println("Seq array not sorted correctly!");
                     }
                 }
-                long parallelTime = (System.currentTimeMillis() - startTime) / (long)TRIALS;
+                long parallelTimeM = (System.currentTimeMillis() - startTime) / (long)TRIALS;
+
+                startTime = System.currentTimeMillis();
+                for (int j = 0; j < TRIALS; j++) {
+                    int[] dataCopy = Arrays.copyOf(data, data.length);
+                    QuickSort.sort(dataCopy);
+                    if (!CheckSorted.check(dataCopy)) {
+                        System.out.println("Seq array not sorted correctly!");
+                    }
+                }
+                long sequentialTimeQ = (System.currentTimeMillis() - startTime) / (long)TRIALS;
+
+                startTime = System.currentTimeMillis();
+                for (int j = 0; j < TRIALS; j++) {
+                    int[] dataCopy = Arrays.copyOf(data, data.length);
+                    ParallelQuickSort.sort(dataCopy);
+                    if (!CheckSorted.check(dataCopy)) {
+                        System.out.println("Seq array not sorted correctly!");
+                    }
+                }
+                long parallelTimeQ = (System.currentTimeMillis() - startTime) / (long)TRIALS;
 
                 writer.append(String.valueOf(size));
                 writer.append(", ");
-                writer.append(String.valueOf(sequentialTime));
+                writer.append(String.valueOf(sequentialTimeM));
                 writer.append(", ");
-                writer.append(String.valueOf(parallelTime));
+                writer.append(String.valueOf(parallelTimeM));
+                writer.append(", ");
+                writer.append(String.valueOf(sequentialTimeQ));
+                writer.append(", ");
+                writer.append(String.valueOf(parallelTimeQ));
                 writer.append("\n");
                 i++;
                 System.out.println(i + "/" + sizes.length);
