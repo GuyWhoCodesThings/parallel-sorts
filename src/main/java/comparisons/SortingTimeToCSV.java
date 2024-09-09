@@ -15,7 +15,7 @@ public class SortingTimeToCSV {
         final int MAX = 100000;
         final int TRIALS = 10;
 
-        String csvFile = "times.csv";
+        String csvFile = "merge-sort-times.csv";
         int i = 0;
         try (FileWriter writer = new FileWriter(csvFile)) {
             writer.append("Elements, Seq, Par\n");
