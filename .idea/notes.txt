@@ -1,0 +1,132 @@
+package sorts;
+
+
+import functions.*;
+
+import java.util.*;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class ParallelBucketSort {
+
+    /*
+    Algorithm has 2 main parts:
+    1) put items into correct buckets in parallel (easier to do)
+    2) place items back into original array in parallel (harder to do)
+
+    The issue I encountered was the buckets varied in size, so just knowing the position of bucket
+    was not enough. To overcome this, I first did a parallel prefix sum of the bucket lengths to
+    get the starting index of where each bucket would go to when placing back into the original array
+     */
+
+    private static final ForkJoinPool POOL = new ForkJoinPool();
+    private static final int CUTOFF = 200;
+
+    public static void sort(int[] array){
+        // to minimize # of buckets
+        int maximum = FindMaximum.find(array);
+        int minimum = FindMinimum.find(array);
+        List<Integer>[] bucketArray = new ArrayList[maximum - minimum + 1];
+
+        // locks to be safe when putting items into buckets,
+        // if two threads try to create an arraylist at same index at same time, could cause issue
+        ReentrantLock[] locks = new ReentrantLock[bucketArray.length];
+        for(int j = 0; j < locks.length; j++){
+            locks[j] = new ReentrantLock();
+        }
+        POOL.invoke(new BucketTask(bucketArray, array, 0, array.length, locks, minimum));
+        // prefix sum of bucket lengths
+        int[] prefixSizeSum = ParallelListPrefixSum.parallelListPrefixSum(bucketArray);
+        // sorted array
+        POOL.invoke(new PlaceTask(array, prefixSizeSum, bucketArray, 0, bucketArray.length));
+
+    }
+
+
+
+    private static class BucketTask extends RecursiveAction {
+        int lo, hi, minimum;
+        int[] array;
+        List<Integer>[] bucketArray;
+        ReentrantLock[] locks;
+
+        public BucketTask(List<Integer>[] bucketArray, int[] array, int lo, int hi, ReentrantLock[] locks, int minimum){
+            this.lo = lo;
+            this.hi = hi;
+            this.array = array;
+            this.bucketArray = bucketArray;
+            this.locks = locks;
+            this.minimum = minimum;
+        }
+        protected void compute() {
+            if (hi - lo <= CUTOFF) {
+
+                for (int i = lo; i < hi; i++) {
+                    // lock to prevent issue when multiple threads create list ptr at same index
+                        locks[array[i] - minimum].lock();
+                        if (bucketArray[array[i] - minimum] == null) {
+                            bucketArray[array[i] - minimum] = new ArrayList<Integer>();
+                        }
+                        bucketArray[array[i] - minimum].add(array[i]);
+                        locks[array[i] - minimum].unlock();
+
+                }
+            } else {
+                // Divide the array into two halves
+                int mid = lo + (hi - lo) / 2;
+                BucketTask left = new BucketTask(bucketArray, array, lo, mid ,locks, minimum);
+                BucketTask right = new BucketTask(bucketArray, array, mid, hi, locks, minimum);
+
+                left.fork();
+                right.compute();
+                left.join();
+            }
+        }
+
+    }
+    private static class PlaceTask extends RecursiveAction {
+        int lo, hi;
+        int[] array, prefixSizeSum;
+        List<Integer>[] bucketArray;
+
+        public PlaceTask(int[] array, int[] prefixSizeSum, List<Integer>[] bucketArray, int lo, int hi){
+            this.array = array;
+            this.prefixSizeSum = prefixSizeSum;
+            this.bucketArray = bucketArray;
+            this.lo = lo;
+            this.hi = hi;
+
+        }
+
+        protected void compute() {
+            if (hi - lo <= CUTOFF) {
+
+                for(int i = lo; i < hi; i++){
+                    // ensure bucket has items
+                    if (bucketArray[i] != null && !bucketArray[i].isEmpty()) {
+                        int currPosition = 0;
+                        for(int value: bucketArray[i]){
+                            // place items from bucket into original array based on
+                            // the prefix bucket size sum + position in bucket
+
+                            array[prefixSizeSum[i] - 1 - currPosition] = value;
+                            currPosition++;
+                        }
+                    }
+                }
+
+            } else {
+                // Divide the array into two halves
+                int mid = lo + (hi - lo) / 2;
+                PlaceTask left = new PlaceTask(array, prefixSizeSum, bucketArray, lo, mid);
+                PlaceTask right = new PlaceTask(array, prefixSizeSum, bucketArray, mid, hi);
+                left.fork();
+                right.compute();
+                left.join();
+
+            }
+        }
+
+}}
+
