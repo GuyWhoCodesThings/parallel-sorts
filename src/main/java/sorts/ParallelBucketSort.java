@@ -8,41 +8,19 @@ import java.util.concurrent.RecursiveAction;
 
 public class ParallelBucketSort {
 
-    /*
-    Algorithm has 2 main parts:
-    1) put items into correct buckets in parallel (easier to do)
-    2) place items back into original array in parallel (harder to do)
-
-    The issue I encountered was the buckets varied in size, so just knowing the position of bucket
-    was not enough. To overcome this, I first did a parallel prefix sum of the bucket lengths to
-    get the starting index of where each bucket would go to when placing back into the original array
-     */
 
     private static final ForkJoinPool POOL = new ForkJoinPool();
     private static final int CUTOFF = 15;
 
     public static void sort(int[] array){
-        // to minimize # of buckets
-//        int maximum = FindMaximum.find(array);
-//        System.out.println("maximum: " + maximum);
-//        int minimum = FindMinimum.find(array);
-//        System.out.println("minimum: " + minimum);
-//        int[] bucketArray = new int[maximum - minimum + 1];
+     
         int[] bucketArray = new int[array.length];
         // locks to be safe when putting items into buckets,
         // if two threads try to create an arraylist at same index at same time, could cause issue
         POOL.invoke(new BucketTask(bucketArray, array, 0, array.length, 0));
-//        for(int b: bucketArray){
-//            System.out.print(b + " ");
-//        }
-//        System.out.println("");
-        // normal prefix sum instead
+
         int[] prefixSum = ParallelPrefixSum.prefixSum(bucketArray);
-//        for(int b: prefixSum){
-//            System.out.print(b + " ");
-//        }
-//        System.out.println("");
-        // sorted array
+
         POOL.invoke(new PlaceTask(array, prefixSum, bucketArray, 0, bucketArray.length, 0));
 
     }
